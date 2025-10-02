@@ -1,277 +1,232 @@
 <!doctype html>
 <html lang="es">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Raspi Gas Test — Terminal de Monitoreo</title>
-<link rel="icon" href="data:,">
-<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js"></script>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Test WebSocket — Raspi Gas</title>
 <style>
-  :root{ color-scheme:light dark; --bg:#ffffff; --fg:#111; --muted:#6b7280; --card:#ffffff; --border:#e5e7eb }
-  .dark{ --bg:#0b0b0e; --fg:#e5e7eb; --muted:#9ca3af; --card:#0f1115; --border:#1f2937 }
-  *{ box-sizing:border-box; }
-  body{ margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial; background:var(--bg); color:var(--fg); }
-  .container{ max-width:1160px; margin:0 auto; padding:16px; }
-  .row{ display:grid; gap:16px; }
-  @media (min-width: 900px){ .col-2{ grid-template-columns:2fr 1fr } .col-3{ grid-template-columns:2fr 1fr 1fr } .col-5{ grid-template-columns:repeat(5,1fr) } .col-2eq{ grid-template-columns:1fr 1fr } }
-  .card{ background:color-mix(in oklab, var(--card) 92%, transparent); backdrop-filter:saturate(120%) blur(6px); border:1px solid var(--border); border-radius:14px; padding:14px; }
-  .btn{ border:1px solid var(--border); background:transparent; color:var(--fg); padding:8px 10px; border-radius:10px; cursor:pointer }
-  .btn:hover{ background:color-mix(in oklab, var(--border) 20%, transparent) }
-  .input, .select{ width:100%; border:1px solid var(--border); background:transparent; color:var(--fg); padding:8px 10px; border-radius:10px; }
-  .muted{ color:var(--muted); font-size:12px }
-  .kpi-title{ color:var(--muted); font-size:12px; }
-  .kpi-value{ font-size:28px; font-weight:600 }
-  .badge{ display:inline-flex; align-items:center; gap:6px; font-size:13px }
+  :root{ --bg:#0b0b0e; --fg:#e5e7eb; --muted:#94a3b8; --ok:#10b981; --warn:#f59e0b; --err:#ef4444; --b:#1f2937 }
+  html,body{ margin:0; height:100%; background:var(--bg); color:var(--fg); font-family:system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial }
+  .wrap{ max-width:900px; margin:0 auto; padding:16px }
+  .card{ background:#0f1115; border:1px solid var(--b); border-radius:12px; padding:12px; }
+  .row{ display:flex; gap:8px; flex-wrap:wrap; align-items:end }
+  .col{ flex:1 1 260px }
+  label{ display:block; font-size:12px; color:var(--muted); margin-bottom:6px }
+  input{ width:100%; padding:10px 12px; border-radius:10px; border:1px solid var(--b); background:transparent; color:var(--fg) }
+  button{ padding:10px 12px; border-radius:10px; border:1px solid var(--b); background:transparent; color:var(--fg); cursor:pointer }
+  button:hover{ background:#141821 }
+  .badge{ display:inline-flex; align-items:center; gap:6px; font-size:14px }
   .dot{ width:10px; height:10px; border-radius:999px; display:inline-block }
-  .dot.ok{ background:#10b981 } .dot.warn{ background:#f59e0b } .dot.err{ background:#ef4444 }
-  .toolbar{ display:flex; gap:8px; flex-wrap:wrap; align-items:end }
-  .grid{ display:grid; gap:16px }
-  .h-240{ height:240px } .h-360{ height:360px }
-  .table{ width:100%; border-collapse:collapse; font-size:13px }
-  .table th, .table td{ border-top:1px solid var(--border); padding:6px 8px; text-align:left }
-  .scroll{ max-height:220px; overflow:auto; padding-right:6px }
-  .pill{ font-size:12px; padding:2px 8px; border-radius:999px; border:1px solid var(--border) }
-  .header{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px }
-  .logo{ width:32px; height:32px; border-radius:10px; background:#6366f1 }
+  .ok{ background:var(--ok) } .warn{ background:var(--warn) } .err{ background:var(--err) }
+  .muted{ color:var(--muted); font-size:12px }
+  pre{ margin:0; white-space:pre-wrap; word-break:break-word; font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-size:12px; color:#cbd5e1 }
+  .log{ height:280px; overflow:auto; padding-right:6px; background:#0b0d12; border:1px solid var(--b); border-radius:10px }
+  .kv{ display:grid; grid-template-columns:140px 1fr; gap:8px; margin-top:8px }
+  .kv div{ font-size:14px }
 </style>
 </head>
 <body>
-<div class="container" id="app">
-  <div class="header">
-    <div style="display:flex; align-items:center; gap:10px">
-      <div class="logo"></div>
+<div class="wrap">
+  <h1 style="margin:0 0 10px 0; font-size:20px">Test WebSocket — Raspi Gas</h1>
+  <div class="card" style="margin-bottom:12px">
+    <div class="row">
+      <div class="col">
+        <label>WSS URL (requerido en GitHub Pages)</label>
+        <input id="wsUrl" placeholder="wss://tu-endpoint (Cloudflare/ngrok/Caddy)" />
+        <div id="httpsWarn" class="muted" style="margin-top:6px"></div>
+      </div>
       <div>
-        <div style="font-weight:600; font-size:18px">Raspi Gas Test — Terminal de Monitoreo</div>
-        <div class="badge" id="statusBadge"><span class="dot err"></span><span>desconectado</span><span class="muted" id="latencyTxt"></span></div>
+        <button id="connectBtn">Conectar</button>
+      </div>
+      <div>
+        <button id="disconnectBtn">Desconectar</button>
+      </div>
+      <div>
+        <button id="sendPingBtn" title='Envía {"type":"ping","t":Date.now()}'>Ping</button>
+      </div>
+      <div>
+        <button id="clearLogBtn" title="Limpia el log">Limpiar log</button>
       </div>
     </div>
-    <div style="display:flex; gap:8px">
-      <button class="btn" id="themeBtn">🌙 Oscuro</button>
+    <div style="margin-top:10px; display:flex; gap:16px; align-items:center; flex-wrap:wrap">
+      <div class="badge" id="status"><span class="dot err"></span><span>desconectado</span></div>
+      <div class="muted">Latencia: <span id="lat">—</span></div>
+      <div class="muted">Mensajes: <span id="count">0</span></div>
+      <div class="muted">Último error: <span id="lastErr">—</span></div>
     </div>
   </div>
 
-  <!-- Panel de control -->
+  <div class="card" style="margin-bottom:12px">
+    <div style="font-weight:600; margin-bottom:6px">Último mensaje</div>
+    <pre id="lastMsg">—</pre>
+    <div class="kv">
+      <div class="muted">ts:</div><div id="lastTs">—</div>
+      <div class="muted">temperature_c:</div><div id="lastTemp">—</div>
+      <div class="muted">source:</div><div id="lastSource">—</div>
+    </div>
+  </div>
+
   <div class="card">
-    <div class="toolbar">
-      <div style="flex:1">
-        <label class="muted">WS/WSS URL</label>
-        <input id="wsInput" class="input" placeholder="wss://tu-endpoint-wss (ej. trycloudflare/ngrok/Caddy)" />
-        <div class="muted" id="httpsWarn"></div>
-      </div>
-      <button class="btn" id="saveUrlBtn">Guardar URL</button>
-      <button class="btn" id="pauseBtn">⏸️ Pausar</button>
-      <button class="btn" id="demoBtn">🧪 Modo Demo</button>
-      <div>
-        <label class="muted">Unidad</label>
-        <select id="unitSel" class="select"><option value="C">°C</option><option value="F">°F</option></select>
-      </div>
-      <div>
-        <label class="muted">Rango</label>
-        <select id="rangeSel" class="select">
-          <option value="5">5 min</option><option value="15">15 min</option>
-          <option value="60">60 min</option><option value="360">6 h</option>
-          <option value="1440">24 h</option><option value="0">Desde inicio</option>
-        </select>
-      </div>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px">
+      <div style="font-weight:600">Log de mensajes (máx 200)</div>
+      <label style="display:flex; align-items:center; gap:6px"><input type="checkbox" id="autoscroll" checked /> <span class="muted">Autoscroll</span></label>
     </div>
-    <div class="grid" style="margin-top:12px; grid-template-columns: repeat(6, minmax(0,1fr)); gap:10px">
-      <div><label class="muted">tMin</label><input id="tMin" type="number" step="0.1" class="input" value="18"></div>
-      <div><label class="muted">tMax</label><input id="tMax" type="number" step="0.1" class="input" value="30"></div>
-      <div><label class="muted">alertLow</label><input id="aLow" type="number" step="0.1" class="input" value="19"></div>
-      <div><label class="muted">alertHigh</label><input id="aHigh" type="number" step="0.1" class="input" value="28"></div>
-      <div><label class="muted">histeresis</label><input id="hyst" type="number" step="0.1" class="input" value="0.5"></div>
-      <div><label class="muted">retardo (s)</label><input id="delay" type="number" step="1" class="input" value="5"></div>
-    </div>
+    <div class="log"><pre id="log"></pre></div>
   </div>
 
-  <!-- KPIs -->
-  <div class="row col-5" style="margin-top:16px">
-    <div class="card"><div class="kpi-title">Actual</div><div class="kpi-value" id="kpiNow">—</div><div class="muted" id="kpiAge">—</div></div>
-    <div class="card"><div class="kpi-title">Mín</div><div class="kpi-value" id="kpiMin">—</div></div>
-    <div class="card"><div class="kpi-title">Máx</div><div class="kpi-value" id="kpiMax">—</div></div>
-    <div class="card"><div class="kpi-title">Media</div><div class="kpi-value" id="kpiMean">—</div></div>
-    <div class="card"><div class="kpi-title">Desv. Est.</div><div class="kpi-value" id="kpiStd">—</div></div>
-  </div>
-
-  <div class="row col-2" style="margin-top:16px">
-    <div class="card">
-      <div class="header">
-        <div style="font-weight:600">Serie temporal</div>
-        <div style="display:flex; gap:8px">
-          <button class="btn" id="csvBtn">⬇️ CSV</button>
-          <button class="btn" id="pngBtn">🖼️ PNG</button>
-        </div>
-      </div>
-      <div id="timeChart" class="h-360"></div>
-    </div>
-    <div class="grid">
-      <div class="card">
-        <div style="font-weight:600; margin-bottom:8px">Gauge</div>
-        <div id="gaugeChart" class="h-240"></div>
-      </div>
-      <div class="card">
-        <div style="font-weight:600; margin-bottom:8px">Histograma</div>
-        <div id="histChart" class="h-240"></div>
-      </div>
-    </div>
-  </div>
-
-  <div class="row col-2eq" style="margin-top:16px">
-    <div class="card">
-      <div class="header">
-        <div style="font-weight:600">Alertas</div>
-        <div class="muted" id="alertState">Sin alertas activas</div>
-      </div>
-      <div class="scroll">
-        <table class="table" id="alertsTable">
-          <thead><tr><th>Tipo</th><th>Inicio</th><th>Fin</th><th>Pico</th></tr></thead>
-          <tbody></tbody>
-        </table>
-      </div>
-    </div>
-    <div class="card">
-      <div class="header">
-        <div style="font-weight:600">Timeline</div>
-        <button class="btn" id="tlCsvBtn">⬇️ CSV</button>
-      </div>
-      <ul class="scroll" id="timeline" style="list-style:none; padding-left:0; margin:0"></ul>
-    </div>
-  </div>
+  <p class="muted" style="margin-top:10px">
+    Consejos: Si cargas esta página en <b>HTTPS</b> (GitHub Pages), tu socket debe ser <b>WSS</b>. Usa el parámetro <code>?ws=wss://...</code> para autocompletar.
+    Si tu servidor no implementa <code>pong</code>, el botón Ping solo enviará el mensaje y la latencia mostrada permanecerá en <i>—</i>.
+  </p>
 </div>
 
 <script>
 (function(){
-  // ---------- Estado ----------
-  const state = {
-    theme: localStorage.getItem('theme') || 'dark',
-    unit: localStorage.getItem('unit') || 'C',
-    // ⬇️ CLAVE para GitHub Pages (HTTPS): NO usar ws:// por defecto
-    wsUrl: (new URLSearchParams(location.search)).get('ws') || localStorage.getItem('wsUrl') || '',
-    connected: 'disconnected',
-    latencyMs: null,
-    paused: false,
-    demo: false,
-    buffer: [],
-    maxBufferMs: 30*60*1000,
-    rangeMinMs: 5*60*1000,
-    thresholds: {
-      tMin: Number(localStorage.getItem('tMin') ?? 18),
-      tMax: Number(localStorage.getItem('tMax') ?? 30),
-      alertLow: Number(localStorage.getItem('alertLow') ?? 19),
-      alertHigh: Number(localStorage.getItem('alertHigh') ?? 28),
-      hysteresis: Number(localStorage.getItem('hyst') ?? 0.5),
-      delayS: Number(localStorage.getItem('delayS') ?? 5),
-    },
-    alerts: [],
-    timeline: [],
+  const el = (id) => document.getElementById(id)
+
+  const wsUrl = el('wsUrl')
+  const connectBtn = el('connectBtn')
+  const disconnectBtn = el('disconnectBtn')
+  const sendPingBtn = el('sendPingBtn')
+  const clearLogBtn = el('clearLogBtn')
+  const statusEl = el('status')
+  const latEl = el('lat')
+  const cntEl = el('count')
+  const lastErrEl = el('lastErr')
+  const lastMsgEl = el('lastMsg')
+  const lastTsEl = el('lastTs')
+  const lastTempEl = el('lastTemp')
+  const lastSrcEl = el('lastSource')
+  const logEl = el('log')
+  const httpsWarn = el('httpsWarn')
+  const autoscroll = el('autoscroll')
+
+  let ws = null
+  let msgCount = 0
+  let backoff = 1000
+  let pingOutstanding = null      // {t:number}
+  let reconnectTimer = null
+
+  // Inicial: toma ?ws= o localStorage
+  const qs = new URLSearchParams(location.search)
+  wsUrl.value = qs.get('ws') || localStorage.getItem('ws_test_url') || ''
+  if (location.protocol === 'https:' && wsUrl.value.startsWith('ws://')) {
+    httpsWarn.textContent = 'Estás en HTTPS → debes usar wss://'
   }
 
-  const $ = s=>document.querySelector(s)
-  const setTheme=t=>{ state.theme=t; document.documentElement.classList.toggle('dark',t==='dark'); localStorage.setItem('theme',t); $('#themeBtn').textContent=t==='dark'?'☀️ Claro':'🌙 Oscuro' }
-  const fmtT=v=> v==null||isNaN(v)?'—':(state.unit==='C'?`${v.toFixed(2)} °C`:`${(v*9/5+32).toFixed(2)} °F`)
-  const pushTL=(kind,msg)=>{ state.timeline.unshift({id:crypto.randomUUID(),t:Date.now(),kind:kind,message:msg}); state.timeline.splice(500); renderTL() }
-
-  // Refs
-  const wsInput=$('#wsInput'), httpsWarn=$('#httpsWarn'), saveBtn=$('#saveUrlBtn')
-  const unitSel=$('#unitSel'), rangeSel=$('#rangeSel'), pauseBtn=$('#pauseBtn'), demoBtn=$('#demoBtn')
-  const tMinIn=$('#tMin'), tMaxIn=$('#tMax'), aLowIn=$('#aLow'), aHighIn=$('#aHigh'), hystIn=$('#hyst'), delayIn=$('#delay')
-  const statusBadge=$('#statusBadge'), latencyTxt=$('#latencyTxt')
-  const kNow=$('#kpiNow'), kMin=$('#kpiMin'), kMax=$('#kpiMax'), kMean=$('#kpiMean'), kStd=$('#kpiStd'), kAge=$('#kpiAge')
-  const timeEl=echarts.init($('#timeChart')), histEl=echarts.init($('#histChart')), gaugeEl=echarts.init($('#gaugeChart'))
-  const csvBtn=$('#csvBtn'), pngBtn=$('#pngBtn'), tlCsvBtn=$('#tlCsvBtn')
-
-  setTheme(state.theme); unitSel.value=state.unit; wsInput.value=state.wsUrl
-  if(location.protocol==='https:' && state.wsUrl.startsWith('ws://')){ httpsWarn.textContent='Estás en HTTPS: debes usar wss://'; }
-  const saveThresh=()=>{ const th=state.thresholds; localStorage.setItem('tMin',th.tMin); localStorage.setItem('tMax',th.tMax); localStorage.setItem('alertLow',th.alertLow); localStorage.setItem('alertHigh',th.alertHigh); localStorage.setItem('hyst',th.hysteresis); localStorage.setItem('delayS',th.delayS); }
-
-  // Eventos
-  $('#themeBtn').onclick=()=>setTheme(state.theme==='dark'?'light':'dark')
-  saveBtn.onclick=()=>{
-    if(location.protocol==='https:' && wsInput.value.startsWith('ws://')){ httpsWarn.textContent='HTTPS requiere WSS'; return }
-    state.wsUrl=wsInput.value.trim(); localStorage.setItem('wsUrl',state.wsUrl)
-    pushTL('CONFIG',`WS URL: ${state.wsUrl||'(vacía)'}`); reconnect()
-  }
-  unitSel.onchange=()=>{ state.unit=unitSel.value; localStorage.setItem('unit',state.unit); renderAll() }
-  rangeSel.onchange=()=>{ state.rangeMinMs=Number(rangeSel.value)*60*1000; renderAll() }
-  pauseBtn.onclick=()=>{ state.paused=!state.paused; pauseBtn.textContent=state.paused?'▶️ Continuar':'⏸️ Pausar' }
-  demoBtn.onclick=()=>{ state.demo=!state.demo; demoBtn.textContent=state.demo?'⛔ Salir Demo':'🧪 Modo Demo'; reconnect() }
-  ;[tMinIn,tMaxIn,aLowIn,aHighIn,hystIn,delayIn].forEach(i=>i.onchange=()=>{
-    state.thresholds.tMin=Number(tMinIn.value); state.thresholds.tMax=Number(tMaxIn.value)
-    state.thresholds.alertLow=Number(aLowIn.value); state.thresholds.alertHigh=Number(aHighIn.value)
-    state.thresholds.hysteresis=Number(hystIn.value); state.thresholds.delayS=Number(delayIn.value)
-    saveThresh(); renderAll()
-  })
-  csvBtn.onclick=exportCSV; pngBtn.onclick=exportPNG; tlCsvBtn.onclick=exportTLCsv
-
-  // Conexión / Demo
-  let ws=null, pingTimer=null, pongTimer=null, backoff=1000, highTimer=null, lowTimer=null
-  const setConn=s=>{ state.connected=s; statusBadge.innerHTML=`<span class="dot ${s==='connected'?'ok':s==='reconnecting'?'warn':'err'}"></span><span>${s}</span><span class="muted" id="latencyTxt">${state.latencyMs!=null?'• '+state.latencyMs+' ms':''}</span>` }
-
-  function reconnect(){
-    if(ws){ try{ws.close()}catch{} ws=null } if(pingTimer){clearInterval(pingTimer); pingTimer=null} if(pongTimer){clearTimeout(pongTimer); pongTimer=null}
-    state.buffer=[]; renderAll()
-    if(state.demo){ setConn('connected'); pushTL('RECONNECT','Demo activo'); runDemo(); return }
-    if(!state.wsUrl){ setConn('disconnected'); httpsWarn.textContent='Ingresa tu WSS (ej: wss://subdominio.trycloudflare.com) o activa Modo Demo.'; return }
-    if(location.protocol==='https:' && state.wsUrl.startsWith('ws://')){ setConn('disconnected'); httpsWarn.textContent='HTTPS → usa wss://'; return }
-    openSocket()
-  }
-  function openSocket(){
-    setConn('reconnecting')
-    try{ ws=new WebSocket(state.wsUrl) }catch{ setConn('disconnected'); return }
-    ws.onopen=()=>{ setConn('connected'); pushTL('RECONNECT',`Conectado a ${state.wsUrl}`); backoff=1000
-      pingTimer=setInterval(()=>{ if(!ws||ws.readyState!==1)return; const t=Date.now(); ws.send(JSON.stringify({type:'ping',t})); if(pongTimer)clearTimeout(pongTimer); pongTimer=setTimeout(()=>{ try{ws.close()}catch{} },10000)},25000)}
-    ws.onmessage=(ev)=>{ try{ const msg=JSON.parse(ev.data)
-        if(msg.type==='pong' && typeof msg.latency==='number'){ state.latencyMs=msg.latency; setConn('connected'); return }
-        if(typeof msg.ts==='number' && typeof msg.temperature_c==='number' && !state.paused){
-          addSample({ ts:msg.ts, value:msg.temperature_c, source:msg.source })
-        }}catch{} }
-    ws.onclose=()=>{ setConn('reconnecting'); setTimeout(openSocket, Math.min(backoff,30000)); backoff*=2 }
-    ws.onerror=()=>{ try{ws.close()}catch{} }
-  }
-  let demoInt=null
-  function runDemo(){ if(demoInt)clearInterval(demoInt); const t0=Date.now(); demoInt=setInterval(()=>{ if(state.paused)return; const t=Date.now(), s=(t-t0)/1000, base=26+2*Math.sin(s/10*Math.PI), door=Math.random()<0.02?3:0, val=base+door+(Math.random()-0.5)*0.3; addSample({ts:t,value:val,source:'demo'}) },1000) }
-  function addSample(s){ state.buffer.push(s); const now=s.ts; state.buffer=state.buffer.filter(x=>now-x.ts<=state.maxBufferMs); processAlerts(s); renderAll() }
-
-  function processAlerts(sample){
-    const {alertHigh,alertLow,hysteresis,delayS}=state.thresholds; const actH=state.alerts.find(a=>a.type==='ALERT_HIGH_START'&&!a.tEnd); const actL=state.alerts.find(a=>a.type==='ALERT_LOW_START'&&!a.tEnd); const v=sample.value, ts=sample.ts
-    if(!actH && v>=alertHigh){ if(!highTimer){ highTimer=setTimeout(()=>{ const id=crypto.randomUUID(); state.alerts.push({id,type:'ALERT_HIGH_START',tStart:ts,peak:v}); pushTL('ALERT',`Alerta ALTA iniciada: ${v.toFixed(2)}°C`); highTimer=null; renderAlerts() },delayS*1000) } }
-    else if(actH && v<=alertHigh-hysteresis){ actH.tEnd=ts; pushTL('ALERT','Alerta ALTA finalizada'); renderAlerts() }
-    if(!actL && v<=alertLow){ if(!lowTimer){ lowTimer=setTimeout(()=>{ const id=crypto.randomUUID(); state.alerts.push({id,type:'ALERT_LOW_START',tStart:ts,peak:v}); pushTL('ALERT',`Alerta BAJA iniciada: ${v.toFixed(2)}°C`); lowTimer=null; renderAlerts() },delayS*1000) } }
-    else if(actL && v>=alertLow+hysteresis){ actL.tEnd=ts; pushTL('ALERT','Alerta BAJA finalizada'); renderAlerts() }
+  function setStatus(kind, text){
+    const color = kind === 'ok' ? 'ok' : kind === 'warn' ? 'warn' : 'err'
+    statusEl.innerHTML = `<span class="dot ${color}"></span><span>${text}</span>`
   }
 
-  // Render
-  const getVisible=()=> state.rangeMinMs? state.buffer.filter(p=>p.ts>=Date.now()-state.rangeMinMs) : [...state.buffer]
-  function renderTime(){ const data=getVisible().map(p=>[p.ts,p.value]); const {tMin,tMax,alertLow,alertHigh}=state.thresholds
-    timeEl.setOption({ animation:false, grid:{left:48,right:20,top:20,bottom:44}, xAxis:{type:'time'}, yAxis:{type:'value',min:tMin,max:tMax}, tooltip:{trigger:'axis'}, dataZoom:[{type:'inside'},{type:'slider'}],
-      series:[ {type:'line',showSymbol:false,data}, {type:'line',data:[],markArea:{silent:true,itemStyle:{color:'rgba(244,63,94,0.12)'},data:[[ {yAxis:alertHigh},{yAxis:tMax} ]]}}, {type:'line',data:[],markArea:{silent:true,itemStyle:{color:'rgba(59,130,246,0.12)'},data:[[ {yAxis:tMin},{yAxis:alertLow} ]]}} ] }) }
-  function renderGauge(){ const cur=state.buffer.length?state.buffer[state.buffer.length-1].value:0; const {tMin,tMax}=state.thresholds
-    gaugeEl.setOption({ animation:false, series:[{type:'gauge',min:tMin,max:tMax,splitNumber:5,axisLine:{lineStyle:{width:12}},pointer:{width:4},detail:{valueAnimation:false,formatter:v=> state.unit==='C'?`${(+v).toFixed(1)}°C`:`${((+v)*9/5+32).toFixed(1)}°F`},data:[{value:cur}]}] }) }
-  function renderHist(){ const vals=getVisible().map(p=>p.value); const {tMin,tMax}=state.thresholds; const bins=20,min=tMin,max=tMax,width=(max-min)/bins; const counts=Array(bins).fill(0); for(const v of vals){ const i=Math.max(0,Math.min(bins-1,Math.floor((v-min)/width))); counts[i]++ } const x=Array.from({length:bins},(_,i)=>(min+i*width).toFixed(1))
-    histEl.setOption({ animation:false, grid:{left:40,right:16,top:16,bottom:40}, xAxis:{type:'category',data:x}, yAxis:{type:'value'}, tooltip:{trigger:'axis'}, series:[{type:'bar',data:counts}] }) }
-  function renderKPIs(){ const vis=getVisible(); if(vis.length===0){ kNow.textContent='—'; kMin.textContent='—'; kMax.textContent='—'; kMean.textContent='—'; kStd.textContent='—'; kAge.textContent='—'; return } const vals=vis.map(p=>p.value); const n=vals.length; const mean=vals.reduce((a,b)=>a+b,0)/n; const std=Math.sqrt(vals.reduce((a,b)=>a+(b-mean)*(b-mean),0)/n); const min=Math.min(...vals), max=Math.max(...vals); const cur=vals[n-1]; const age=Date.now()-vis[vis.length-1].ts
-    const cutoff=Date.now()-60000; const past=vis.find(p=>p.ts>=cutoff)||vis[0]; const trend=cur-past.value; const ti=trend>0.1?'↗':trend<-0.1?'↘':'→'
-    kNow.textContent=fmtT(cur)+' '+ti; kMin.textContent=fmtT(min); kMax.textContent=fmtT(max); kMean.textContent=fmtT(mean); kStd.textContent=isFinite(std)?std.toFixed(2):'—'; kAge.textContent=`hace ${Math.round(age)} ms` }
-  function renderAlerts(){ const act=state.alerts.filter(a=>!a.tEnd); $('#alertState').textContent=act.length?'⚠️ Activas':'Sin alertas activas'; const tbody=$('#alertsTable tbody'); tbody.innerHTML=state.alerts.map(a=>`<tr><td>${a.type}</td><td>${dayjs(a.tStart).format('HH:mm:ss')}</td><td>${a.tEnd?dayjs(a.tEnd).format('HH:mm:ss'):'—'}</td><td>${a.peak?.toFixed(2)??'—'}</td></tr>`).join('') }
-  function renderTL(){ const ul=$('#timeline'); ul.innerHTML=state.timeline.map(e=>`<li style="display:flex;gap:8px;align-items:center;padding:4px 0"><span class="muted" style="width:86px">${dayjs(e.t).format('HH:mm:ss.SSS')}</span><span class="pill">${e.kind}</span><span style="font-size:14px">${e.message}</span></li>`).join('') }
-  const renderAll=()=>{ renderTime(); renderGauge(); renderHist(); renderKPIs(); renderAlerts() }
+  function log(line){
+    const stamp = new Date().toISOString()
+    logEl.textContent += `[${stamp}] ${line}\n`
+    if (autoscroll.checked) {
+      logEl.parentElement.scrollTop = logEl.parentElement.scrollHeight
+    }
+  }
 
-  // Export
-  function exportCSV(){ const rows=[['ts','value','source'], ...getVisible().map(p=>[String(p.ts),String(p.value),p.source||''])]; const blob=new Blob([rows.map(r=>r.join(',')).join('\n')],{type:'text/csv;charset=utf-8;'}); const u=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=u; a.download=`series-${Date.now()}.csv`; a.click(); URL.revokeObjectURL(u) }
-  function exportPNG(){ const url=timeEl.getDataURL({type:'png',pixelRatio:2,backgroundColor: state.theme==='dark'?'#0b0b0e':'#ffffff'}); const a=document.createElement('a'); a.href=url; a.download=`timechart-${Date.now()}.png`; a.click() }
-  function exportTLCsv(){ const rows=[['t','kind','message'], ...state.timeline.map(e=>[String(e.t),e.kind,e.message])]; const blob=new Blob([rows.map(r=>r.join(',')).join('\n')],{type:'text/csv;charset=utf-8;'}); const u=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=u; a.download=`timeline-${Date.now()}.csv`; a.click(); URL.revokeObjectURL(u) }
+  function connect(){
+    const url = wsUrl.value.trim()
+    if (!url) { log('❌ URL vacía'); setStatus('err','desconectado'); return }
+    if (location.protocol === 'https:' && url.startsWith('ws://')) {
+      httpsWarn.textContent = 'HTTPS requiere WSS (wss://...)'
+      log('❌ Bloqueado: ws:// en contexto HTTPS')
+      setStatus('err','desconectado')
+      return
+    }
+    // guarda
+    localStorage.setItem('ws_test_url', url)
 
-  // Atajos
-  window.addEventListener('keydown', e=>{ if(e.key.toLowerCase()==='m') pushTL('MARK','Marca manual'); if(e.key===' '){ state.paused=!state.paused; $('#pauseBtn').textContent=state.paused?'▶️ Continuar':'⏸️ Pausar' } if(e.key.toLowerCase()==='z'){ timeEl.dispatchAction({type:'dataZoom',start:0,end:100}) } })
+    try {
+      setStatus('warn','conectando...')
+      ws = new WebSocket(url)
+      ws.onopen = () => {
+        setStatus('ok','conectado')
+        log('✅ Conexión abierta')
+        backoff = 1000
+      }
+      ws.onmessage = (ev) => {
+        let data = null
+        try { data = JSON.parse(ev.data) } catch { data = ev.data }
+        msgCount++
+        cntEl.textContent = String(msgCount)
+        lastMsgEl.textContent = typeof data === 'string' ? data : JSON.stringify(data, null, 2)
 
-  // Botones export
-  $('#csvBtn').onclick=exportCSV; $('#pngBtn').onclick=exportPNG; $('#tlCsvBtn').onclick=exportTLCsv
+        // Parse rápido del payload esperado
+        if (data && typeof data === 'object') {
+          lastTsEl.textContent = (typeof data.ts === 'number') ? new Date(data.ts).toLocaleString() : '—'
+          lastTempEl.textContent = (typeof data.temperature_c === 'number') ? data.temperature_c.toFixed(2) + ' °C' : '—'
+          lastSrcEl.textContent = data.source ?? '—'
+        } else {
+          lastTsEl.textContent = lastTempEl.textContent = lastSrcEl.textContent = '—'
+        }
 
-  // Inicio
-  $('#wsInput').value=state.wsUrl
-  if(!state.wsUrl) $('#httpsWarn').textContent='Pasa tu WSS por ?ws=wss://... o escríbelo y guarda.'
-  ;(function init(){ setTheme(state.theme); reconnect() })()
+        // Latencia si el servidor responde "pong"
+        if (data && typeof data === 'object' && data.type === 'pong') {
+          // 1) si viene "latency"
+          if (typeof data.latency === 'number') {
+            latEl.textContent = data.latency + ' ms'
+          }
+          // 2) si retorna t original
+          else if (pingOutstanding && typeof data.t === 'number') {
+            const rtt = Date.now() - pingOutstanding.t
+            latEl.textContent = rtt + ' ms'
+            pingOutstanding = null
+          }
+        }
+
+        log('⬅️ ' + (typeof data === 'string' ? data : JSON.stringify(data)))
+      }
+      ws.onerror = (e) => {
+        lastErrEl.textContent = 'onerror'
+        log('❌ onerror')
+      }
+      ws.onclose = () => {
+        setStatus('warn','reconectando...')
+        log('⚠️ Conexión cerrada')
+        if (reconnectTimer) clearTimeout(reconnectTimer)
+        reconnectTimer = setTimeout(() => {
+          backoff = Math.min(backoff * 2, 30000)
+          connect()
+        }, backoff)
+      }
+    } catch (err) {
+      lastErrEl.textContent = String(err)
+      setStatus('err','desconectado')
+      log('❌ Error creando WebSocket: ' + err)
+    }
+  }
+
+  function disconnect(){
+    if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null }
+    if (ws) {
+      try { ws.close() } catch {}
+      ws = null
+      setStatus('err','desconectado')
+      log('🔌 Desconectado manualmente')
+    }
+  }
+
+  function sendPing(){
+    if (!ws || ws.readyState !== 1) { log('❌ No conectado'); return }
+    const t = Date.now()
+    pingOutstanding = { t }
+    const msg = { type: 'ping', t }
+    ws.send(JSON.stringify(msg))
+    log('➡️ ' + JSON.stringify(msg))
+  }
+
+  connectBtn.addEventListener('click', connect)
+  disconnectBtn.addEventListener('click', disconnect)
+  sendPingBtn.addEventListener('click', sendPing)
+  clearLogBtn.addEventListener('click', () => { logEl.textContent = '' })
+
+  // Autoconectar si vino ?ws=
+  if (qs.get('ws')) {
+    connect()
+  }
 })();
 </script>
 </body>
